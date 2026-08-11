@@ -1,7 +1,7 @@
 {
-  "name": "discord-style-chatroom",
-  "version": "1.0.0",
-  "description": "A self-hosted Discord-style chatroom with server support, message history, channels, usernames and avatars.",
+  "name": "wifi bypass website",
+  "version": "5.2.0",
+  "description": "bypassing school wifi restriction",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

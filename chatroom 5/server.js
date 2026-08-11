@@ -16,6 +16,10 @@ const PORT = process.env.PORT || 3000;
 const MAX_MESSAGE_LENGTH = 2000;
 const HISTORY_PAGE_SIZE = 50;
 
+// Behind a reverse proxy (Render, Railway, nginx, etc.) the direct connection IP is the
+// proxy's own address — this tells Express to read the real client IP from X-Forwarded-For.
+app.set('trust proxy', true);
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -125,14 +129,24 @@ app.post('/api/emojis', (req, res) => {
 
 // --- Socket.IO realtime ---
 
-const onlineUsers = new Map(); // socket.id -> { username, avatarColor, avatarUrl, channel }
+const onlineUsers = new Map(); // socket.id -> { username, avatarColor, avatarUrl, channel, ip }
 
 function broadcastPresence(channelId) {
   const users = [...onlineUsers.values()].filter(u => u.channel === channelId);
   io.to(channelId).emit('presence', users);
 }
 
+// Prefer X-Forwarded-For (the real client IP when running behind Render/Railway/nginx/etc.),
+// falling back to the raw socket address for local/direct connections.
+function getClientIp(socket) {
+  const forwarded = socket.handshake.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return socket.handshake.address;
+}
+
 io.on('connection', (socket) => {
+  const ip = getClientIp(socket);
+  console.log(`[connect] socket ${socket.id} from ${ip}`);
 
   socket.on('join', ({ username, avatarColor, avatarUrl, channel }) => {
     username = sanitize(username, 32) || 'Anonymous';
@@ -146,9 +160,10 @@ io.on('connection', (socket) => {
       broadcastPresence(prev.channel);
     }
 
-    onlineUsers.set(socket.id, { username, avatarColor, avatarUrl, channel });
+    onlineUsers.set(socket.id, { username, avatarColor, avatarUrl, channel, ip });
     socket.join(channel);
     broadcastPresence(channel);
+    console.log(`[join] ${username} (${ip}) joined #${channel}`);
   });
 
   socket.on('message', ({ text, imageUrl }) => {

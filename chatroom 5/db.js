@@ -44,13 +44,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions(message_id);
 `);
 
-// Migration safety net: if an older chat.db exists from before image_url was added, patch it in.
 const messageCols = db.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
 if (!messageCols.includes('image_url')) {
   db.exec('ALTER TABLE messages ADD COLUMN image_url TEXT');
 }
 
-// Seed default channels if none exist
+
 const channelCount = db.prepare('SELECT COUNT(*) AS c FROM channels').get().c;
 if (channelCount === 0) {
   const insert = db.prepare('INSERT INTO channels (id, name, topic) VALUES (?, ?, ?)');
